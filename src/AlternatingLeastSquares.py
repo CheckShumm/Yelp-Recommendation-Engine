@@ -2,6 +2,7 @@ import sys
 sys.path.insert(0, '.')
 
 import pandas as pd
+import math
 
 # SparkSQL imports
 from pyspark import SparkContext, SparkConf
@@ -38,59 +39,76 @@ if __name__ == "__main__":
     ss = SparkSession(sc)
 
     # load data
-    restaurantReviews = ss.read.options(header=True, inferSchema=True)\
-                                .csv("../data/yelp_restaurant_review.csv").limit(1000)
-    restaurantReviews = restaurantReviews
+    restaurantReviews = ss.read.options(
+    header=True, inferSchema=True).csv("../data/yelp_local.csv")
+    restaurantReviews = restaurantReviews.repartition(5)
 
     print(restaurantReviews.show(5))
     print("number of partitions: ", restaurantReviews.rdd.getNumPartitions())
     print("number of rows: ", restaurantReviews.count())
     print("Creating training and testing dataset")
-    # Create test and training dataset 80/20
+
+    # Create training, validation and test dataset 60/20/20
     (training, test) = restaurantReviews.randomSplit([0.8, 0.2])
 
-    print("Creating and Tuning ALS Model")
-    # Create Alternating Least Squares Model
-    als = ALS(userCol="userID", itemCol="restaurantID", ratingCol="stars",
-    coldStartStrategy="drop", nonnegative=True)
+    als = ALS(maxIter=5, regParam=0.01, userCol="userID", itemCol="restaurantID", ratingCol="stars",
+          coldStartStrategy="drop")
 
-    # Tune model using ParamGridBuilder
-    param_grid = ParamGridBuilder()\
-                .addGrid(als.rank, [12,13,14])\
-                .addGrid(als.maxIter, [18, 19, 20])\
-                .addGrid(als.regParam, [.17, .18, .19])\
-                .build()
+    model = als.fit(training)
 
-    # Define evaluator as RMSE
+    # Evaluate the model by computing the RMSE on the test data
+    predictions = model.transform(test)
     evaluator = RegressionEvaluator(metricName="rmse", labelCol="stars",
                                     predictionCol="prediction")
 
-    print("Create Train Validation Split")
-    # Build cross validation using TrainValidationSplit
-    cv = CrossValidator(estimator=als,
-                        estimatorParamMaps=param_grid,
-                        evaluator=evaluator,
-                        numFolds=3)
+    rmse = evaluator.evaluate(predictions)
+    print("Root-mean-square error = " + str(rmse))
 
-    print("Fitting Model")
+    # Generate top 10 movie recommendations for each user
+    userRecs = model.recommendForAllUsers(10)
+    print(userRecs.show(5))
+    # print("Creating and Tuning ALS Model")
+    # # Create Alternating Least Squares Model
+    # als = ALS(userCol="userID", itemCol="restaurantID", ratingCol="stars",
+    # coldStartStrategy="drop", nonnegative=True)
+    #
+    # # Tune model using ParamGridBuilder
+    # param_grid = ParamGridBuilder()\
+    #             .addGrid(als.rank, [12,13,14])\
+    #             .addGrid(als.maxIter, [18, 19, 20])\
+    #             .addGrid(als.regParam, [.17, .18, .19])\
+    #             .build()
+    #
+    # # Define evaluator as RMSE
+    # evaluator = RegressionEvaluator(metricName="rmse", labelCol="stars",
+    #                                 predictionCol="prediction")
+    #
+    # print("Create Train Validation Split")
+    # # Build cross validation using TrainValidationSplit
+    # cv = CrossValidator(estimator=als,
+    #                     estimatorParamMaps=param_grid,
+    #                     evaluator=evaluator,
+    #                     numFolds=3)
+    #
+    # print("Fitting Model")
     # Fit model to training Data
-    model = cv.fit(training)
-
-    # Extract best model from tuning
-    best_model = model.bestModel
-
-    # Generate predictions and evaluate using RMSE
-    predictions = best_model.transform(test)
-    rmse = evvaluator.evaluate(predictions)
-
-    print(predictions.sort("user_id", "stars").show(5))
-    # Print evaluation metrics and model parameters
-    print ("RMSE = ", rmse)
-    print("*** Best Model ***")
-    print("  Rank: ", best_model.rank)
-    print("  MaxIter:", best_model._java_obj.parent().getMaxIter())
-    print("  RegParam:", best_model._java_obj.parent().getRegParam())
-
-    # get recommendation for all users
-    userRecs  = best_model.recommendForAllUsers(10)
-    userRecsDF = get_recs_for_user(userRecs)
+    # model = cv.fit(training)
+    #
+    # # Extract best model from tuning
+    # best_model = model.bestModel
+    #
+    # # Generate predictions and evaluate using RMSE
+    # predictions = best_model.transform(test)
+    # rmse = evvaluator.evaluate(predictions)
+    #
+    # print(predictions.sort("user_id", "stars").show(5))
+    # # Print evaluation metrics and model parameters
+    # print ("RMSE = ", rmse)
+    # print("*** Best Model ***")
+    # print("  Rank: ", best_model.rank)
+    # print("  MaxIter:", best_model._java_obj.parent().getMaxIter())
+    # print("  RegParam:", best_model._java_obj.parent().getRegParam())
+    #
+    # # get recommendation for all users
+    # userRecs  = best_model.recommendForAllUsers(10)
+    # userRecsDF = get_recs_for_user(userRecs)
