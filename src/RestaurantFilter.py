@@ -7,6 +7,7 @@ from pyspark import SparkContext, SparkConf
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import lit
 from pyspark.sql.types import FloatType
+
 from commons.Utils import Utils
 
 def splitComma(line: str):
@@ -23,7 +24,7 @@ def restaurantFilter():
 
     # load data
     df = ss.read.options(
-    header=True, inferSchema=True).csv('../data/yelp_business.csv')
+    header=True, inferSchema=True).csv('../data/yelp_business_numerical.csv')
     print(df.show(5))
     print(df.columns)
     # Filter Data
@@ -33,7 +34,7 @@ def restaurantFilter():
     print(df.show(5))
 
     # Clean up
-    df = df[['business_id', 'name', 'latitude', 'longitude']]
+    df = df[['restaurantID', 'name', 'latitude', 'longitude', 'businessID']]
 
     # save to csv
     df.toPandas().to_csv("../data/yelp_restaurant.csv", encoding='utf-8', index=False)

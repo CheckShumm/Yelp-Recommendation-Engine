@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     # load data
     restaurantReviews = ss.read.options(
-    header=True, inferSchema=True).csv("../data/yelp_local.csv")
+    header=True, inferSchema=True).csv("../data/yelp_test.csv")
     restaurantReviews = restaurantReviews.repartition(5)
 
     print(restaurantReviews.show(5))
