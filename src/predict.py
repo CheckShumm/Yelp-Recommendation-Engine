@@ -13,62 +13,36 @@ from pyspark.sql.types import DoubleType,IntegerType
 
 # Spark Machine Learning imports
 from pyspark.ml.evaluation import RegressionEvaluator
-from pyspark.ml.recommendation import ALS
+from pyspark.ml.recommendation import ALS, ALSModel
 from pyspark.ml.tuning import TrainValidationSplit, ParamGridBuilder, CrossValidator
 from pyspark.ml.feature import OneHotEncoder, StringIndexer
 
 # utils
 from spark.utils import *
 
-def als():
+def predict():
     # init spark session
     ss = spark_init('als')
 
     # load restaurant review data
-    df = load_df(ss,'../data/yelp_test.csv')
+    df = load_df(ss,'../data/yelp_numerical.csv')
     df = df.repartition(5)
-
-
-    print("number of partitions: ", df.rdd.getNumPartitions())
-    print_df(df)
-
-    # Convert user_id and business_id to numerical ID
-    user_indexer = StringIndexer(inputCol="user_id", outputCol="int_user_id", handleInvalid="skip")
-    df = user_indexer.fit(df).transform(df)
-
-    # Convert user_id and business_id to numerical ID
-    business_indexer = StringIndexer(inputCol="business_id", outputCol="int_business_id", handleInvalid="skip")
-    df = business_indexer.fit(df).transform(df)
-
-    # save to csv
-    df.toPandas().to_csv("../data/yelp_numerical.csv", encoding='utf-8', index=False)
-    print("Creating training and testing dataset")
 
     # Create training, validation and test dataset 60/20/20
     (training, test) = df.randomSplit([0.8, 0.2])
 
-
-    print("Training model")
-    als = ALS(maxIter=5, regParam=0.01, userCol="int_user_id", itemCol="int_business_id", ratingCol="stars",
-          coldStartStrategy="drop")
-
-    model = als.fit(training)
-    model.save("../model")
-
-    print("Testing model")
-    # Evaluate the model by computing the RMSE on the test data
-    predictions = model.transform(test)
-    evaluator = RegressionEvaluator(metricName="rmse", labelCol="stars",
-                                    predictionCol="prediction")
-
-    rmse = evaluator.evaluate(predictions)
-    print("Root-mean-square error = " + str(rmse))
-
-    # Generate top 10 movie recommendations for each user
+    # # predict restaurant ratings for users
+    model = ALSModel.load("../model")
+    # predictions = model.transform(test)
+    # evaluator = RegressionEvaluator(metricName="rmse", labelCol="stars",
+    #                                 predictionCol="prediction")
+    #
+    # rmse = evaluator.evaluate(predictions)
+    # print("Root-mean-square error = " + str(rmse))
+    #
+    # # Generate top 10 movie recommendations for each user
     print("Creating recommendation for user")
     user_recs = model.recommendForAllUsers(5)
-
-    print(user_recs.show(5))
 
     # Convert int ids to original string ids
     recs = {}
@@ -88,11 +62,11 @@ def als():
     print(recommendations)
 
     # save as json
-    with open('recs.json', 'w') as fp:
+    with open('../data/recs.json', 'w') as fp:
         json.dump(recs, fp, sort_keys=True, indent=4)
 
 def __main__():
-    als()
+    predict()
 
 if __name__ == '__main__':
     __main__()
