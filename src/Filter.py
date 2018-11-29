@@ -71,7 +71,7 @@ def distance_filter():
     "distance", getDistances(struct(restaurants.longitude, restaurants.latitude)))
     restaurants = restaurants.filter(restaurants.distance < radius).sort(restaurants.distance)
     print_df(restaurants)
-
+    reviews.toPandas().to_csv("../data/yelp_local.csv", encoding='utf-8', index=False)
     # Load review data
     reviews = load_df(ss, '../data/yelp_review.csv')
 
@@ -79,7 +79,7 @@ def distance_filter():
     reviews = reviews.join(restaurants, reviews.business_id == restaurants.businessID)
 
     # Clean up
-    reviews = reviews[['business_id','name', 'user_id', 'stars']]
+    reviews = reviews[['business_id', 'user_id', 'stars']]
     print_df(reviews)
 
     # save to csv

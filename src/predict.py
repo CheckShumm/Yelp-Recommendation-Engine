@@ -7,8 +7,8 @@ import math
 
 # SparkSQL imports
 from pyspark import SparkContext, SparkConf
-from pyspark.sql import SparkSession, DataFrame, Row
-from pyspark.sql.functions import max, struct, first
+from pyspark.sql import SparkSession, DataFrame, Row, Column
+from pyspark.sql.functions import max, struct, first, lit
 from pyspark.sql.types import DoubleType,IntegerType
 
 # Spark Machine Learning imports
@@ -22,20 +22,16 @@ from spark.utils import *
 from pprint import pprint
 
 def parse_json(user_id):
-        with open('../data/recs.json') as f:
-            recs = json.load(f)
+        with open('../data/data.json') as f:
+            data = json.load(f)
 
         conf = SparkConf().setAppName("app").setMaster("local[2]")
         sc = SparkContext(conf = conf)
         ss = SparkSession(sc)
 
-        restaurants = sc.parallelize([(k,)+(v,) for k,v in recs.items()]).toDF(['business_id','stars'])
-        user = sc.parallelize([(user_id,) for k in recs.items()]).toDF(['user_id'])
-        data = restaurants.join(user).toDF()
-        print(user.show(5))
-        print(restaurants.show(5))
-        print(data.show(5))
-        
+        df = sc.parallelize([(r['business_id'],)+(data['user_id'],)+(r['stars'],) for r in data["reviews"]]).toDF(['business_id','user_id','stars'])
+        print(df.show(5))
+
 def predict():
     # init spark session
     ss = spark_init('als')
